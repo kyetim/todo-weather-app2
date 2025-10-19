@@ -275,12 +275,20 @@ def complete_todo(todo_id):
         if todo['id'] == todo_id:
             todo['completed'] = not todo['completed']
             break
+    # Hangi sayfadan geldiğini kontrol et
+    referer = request.headers.get('Referer', '')
+    if '/advanced' in referer:
+        return redirect(url_for('advanced_index'))
     return redirect(url_for('index'))
 
 @app.route('/delete/<int:todo_id>')
 def delete_todo(todo_id):
     global todos
     todos = [todo for todo in todos if todo['id'] != todo_id]
+    # Hangi sayfadan geldiğini kontrol et
+    referer = request.headers.get('Referer', '')
+    if '/advanced' in referer:
+        return redirect(url_for('advanced_index'))
     return redirect(url_for('index'))
 
 @app.route('/weather')

@@ -320,4 +320,40 @@
         </div>
     </div>
 </div>
+
+<!-- Edit Modal (Basit versiyon) -->
+{% for todo in todos %}
+<div class="modal fade" id="editModal{{ todo.id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Todo Düzenle</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form method="POST" action="{{ url_for('add_advanced_todo') }}">
+                    <div class="mb-3">
+                        <label for="edit_text_{{ todo.id }}" class="form-label">Todo Metni</label>
+                        <input type="text" name="todo" id="edit_text_{{ todo.id }}" class="form-control" 
+                               value="{{ todo.text }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_priority_{{ todo.id }}" class="form-label">Öncelik</label>
+                        <select name="priority" id="edit_priority_{{ todo.id }}" class="form-select">
+                            <option value="düşük" {% if todo.priority == 'düşük' %}selected{% endif %}>🟢 Düşük</option>
+                            <option value="orta" {% if todo.priority == 'orta' %}selected{% endif %}>🟡 Orta</option>
+                            <option value="yüksek" {% if todo.priority == 'yüksek' %}selected{% endif %}>🔴 Yüksek</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_description_{{ todo.id }}" class="form-label">Açıklama</label>
+                        <textarea name="description" id="edit_description_{{ todo.id }}" class="form-control" rows="2">{{ todo.description or '' }}</textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Güncelle</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
 {% endblock %}
