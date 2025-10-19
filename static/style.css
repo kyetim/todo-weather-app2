@@ -66,7 +66,7 @@ body {
 
 .btn:hover {
     transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 /* Form Stilleri */
@@ -98,15 +98,15 @@ footer {
     .container {
         padding: 10px;
     }
-    
+
     .card {
         margin-bottom: 20px;
     }
-    
+
     .weather-large-icon {
         max-width: 150px;
     }
-    
+
     .display-4 {
         font-size: 2.5rem;
     }
@@ -118,6 +118,7 @@ footer {
         opacity: 0;
         transform: translateY(20px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -167,6 +168,91 @@ footer {
 }
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* Öncelik Badge Stilleri */
+.priority-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 12px;
+    white-space: nowrap;
+    transition: all 0.3s ease;
+}
+
+.priority-yüksek {
+    background-color: #ffebee;
+    color: #c62828;
+    border: 1px solid #ffcdd2;
+}
+
+.priority-orta {
+    background-color: #fff3e0;
+    color: #ef6c00;
+    border: 1px solid #ffcc02;
+}
+
+.priority-düşük {
+    background-color: #e8f5e8;
+    color: #2e7d32;
+    border: 1px solid #c8e6c9;
+}
+
+/* Öncelik seçimi için form stilleri */
+.form-select {
+    border-radius: 8px;
+    border: 2px solid #e9ecef;
+    transition: border-color 0.3s ease;
+}
+
+.form-select:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+/* Todo listesi öncelik sıralaması */
+.list-group-item {
+    border-left: 4px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.list-group-item.priority-yüksek {
+    border-left-color: #c62828;
+}
+
+.list-group-item.priority-orta {
+    border-left-color: #ef6c00;
+}
+
+.list-group-item.priority-düşük {
+    border-left-color: #2e7d32;
+}
+
+/* Öncelik göstergesi hover efekti */
+.priority-badge:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Mobil responsive öncelik badge */
+@media (max-width: 768px) {
+    .priority-badge {
+        font-size: 0.7rem;
+        padding: 3px 6px;
+    }
+
+    .d-flex.align-items-center {
+        flex-wrap: wrap;
+    }
+
+    .priority-badge {
+        margin-top: 4px;
+    }
 }

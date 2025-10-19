@@ -7,14 +7,29 @@ app = Flask(__name__)
 app.secret_key = 'your-secret-key-here'
 
 # Hava durumu API anahtarı (ücretsiz OpenWeatherMap API)
-WEATHER_API_KEY = 'your-openweather-api-key'
+WEATHER_API_KEY = os.getenv('WEATHER_API_KEY', 'e73f50fbc7e75e1594e9c58d5a2f451e')
 WEATHER_API_URL = 'http://api.openweathermap.org/data/2.5/weather'
 
 # Todo listesi (gerçek uygulamada veritabanı kullanılmalı)
 todos = []
 
+def get_priority_order(priority):
+    """Öncelik sıralaması için sayısal değer döndür"""
+    priority_order = {'yüksek': 1, 'orta': 2, 'düşük': 3}
+    return priority_order.get(priority, 2)
+
 def get_weather(city):
     """Hava durumu bilgilerini API'den al"""
+    # Demo modu - API anahtarı yoksa demo veri döndür
+    if WEATHER_API_KEY == 'demo-key':
+        return {
+            'city': city,
+            'temperature': 22,
+            'description': 'açık',
+            'humidity': 65,
+            'icon': '01d'
+        }
+    
     try:
         params = {
             'q': city,
@@ -43,21 +58,33 @@ def index():
     """Ana sayfa - todo listesi ve hava durumu"""
     weather_data = None
     city = request.args.get('city', 'Istanbul')
+    filter_priority = request.args.get('filter')
     
     if city:
         weather_data = get_weather(city)
     
-    return render_template('index.html', todos=todos, weather=weather_data, current_city=city)
+    # Todo'ları filtrele
+    filtered_todos = todos
+    if filter_priority:
+        filtered_todos = [todo for todo in todos if todo.get('priority') == filter_priority]
+    
+    # Todo'ları öncelik sırasına göre sırala
+    sorted_todos = sorted(filtered_todos, key=lambda x: (get_priority_order(x.get('priority', 'orta')), x['id']))
+    
+    return render_template('index.html', todos=sorted_todos, weather=weather_data, current_city=city, current_filter=filter_priority)
 
 @app.route('/add', methods=['POST'])
 def add_todo():
     """Yeni todo ekle"""
     todo_text = request.form.get('todo')
+    priority = request.form.get('priority', 'orta')  # Varsayılan öncelik: orta
+    
     if todo_text:
         todo = {
             'id': len(todos) + 1,
             'text': todo_text,
             'completed': False,
+            'priority': priority,
             'created_at': datetime.now().strftime('%d.%m.%Y %H:%M')
         }
         todos.append(todo)
