@@ -369,5 +369,6 @@ def not_found_error(error):
 def internal_error(error):
     return render_template('500.html'), 500
 
-# Vercel handler
-handler = app
+# Vercel handler - WSGI application
+app.wsgi_app = app.wsgi_app
+handler = app.wsgi_app
