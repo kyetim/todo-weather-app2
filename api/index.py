@@ -2,7 +2,6 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 import requests
 import os
 from datetime import datetime
-from functools import wraps
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-here'
@@ -12,17 +11,8 @@ todos = []
 todo_counter = 0
 
 # Weather API configuration
-WEATHER_API_KEY = os.environ.get('WEATHER_API_KEY', 'demo-key')
+WEATHER_API_KEY = os.environ.get('WEATHER_API_KEY', 'e73f50fbc7e75e1594e9c58d5a2f451e')
 WEATHER_API_URL = 'http://api.openweathermap.org/data/2.5/weather'
-
-def handle_errors(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        try:
-            return f(*args, **kwargs)
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
-    return decorated_function
 
 def get_weather(city):
     if WEATHER_API_KEY == 'demo-key':
@@ -65,7 +55,6 @@ def validate_todo_text(text):
     return 2 <= len(text) <= 500
 
 @app.route('/')
-@handle_errors
 def index():
     city = request.args.get('city', 'Istanbul')
     filter_priority = request.args.get('filter')
@@ -92,7 +81,6 @@ def index():
     )
 
 @app.route('/add', methods=['POST'])
-@handle_errors
 def add_todo():
     global todo_counter
     todo_text = request.form.get('todo')
@@ -117,7 +105,6 @@ def add_todo():
     return redirect(url_for('index'))
 
 @app.route('/complete/<int:todo_id>')
-@handle_errors
 def complete_todo(todo_id):
     for todo in todos:
         if todo['id'] == todo_id:
@@ -127,7 +114,6 @@ def complete_todo(todo_id):
     return redirect(url_for('index'))
 
 @app.route('/delete/<int:todo_id>')
-@handle_errors
 def delete_todo(todo_id):
     global todos
     todos = [todo for todo in todos if todo['id'] != todo_id]
@@ -135,7 +121,6 @@ def delete_todo(todo_id):
     return redirect(url_for('index'))
 
 @app.route('/weather')
-@handle_errors
 def weather():
     city = request.args.get('city', 'Istanbul')
     weather_data = get_weather(city)
