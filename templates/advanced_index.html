@@ -79,19 +79,19 @@
                 <!-- Gelişmiş Filtreler -->
                 <div class="mb-3">
                     <div class="btn-group flex-wrap" role="group">
-                        <a href="{{ url_for('index') }}" class="btn btn-outline-primary">
+                        <a href="{{ url_for('advanced_index') }}" class="btn btn-outline-primary">
                             <i class="fas fa-list"></i> Tümü
                         </a>
-                        <a href="{{ url_for('index', filter='yüksek') }}" class="btn btn-outline-danger">
+                        <a href="{{ url_for('advanced_index', filter='yüksek') }}" class="btn btn-outline-danger">
                             🔴 Yüksek
                         </a>
-                        <a href="{{ url_for('index', filter='orta') }}" class="btn btn-outline-warning">
+                        <a href="{{ url_for('advanced_index', filter='orta') }}" class="btn btn-outline-warning">
                             🟡 Orta
                         </a>
-                        <a href="{{ url_for('index', filter='düşük') }}" class="btn btn-outline-success">
+                        <a href="{{ url_for('advanced_index', filter='düşük') }}" class="btn btn-outline-success">
                             🟢 Düşük
                         </a>
-                        <a href="{{ url_for('index', filter='overdue') }}" class="btn btn-outline-dark">
+                        <a href="{{ url_for('advanced_index', filter='overdue') }}" class="btn btn-outline-dark">
                             ⏰ Süresi Geçmiş
                         </a>
                     </div>
@@ -334,20 +334,22 @@
                 <form method="POST" action="{{ url_for('add_advanced_todo') }}">
                     <div class="mb-3">
                         <label for="edit_text_{{ todo.id }}" class="form-label">Todo Metni</label>
-                        <input type="text" name="todo" id="edit_text_{{ todo.id }}" class="form-control" 
-                               value="{{ todo.text }}" required>
+                        <input type="text" name="todo" id="edit_text_{{ todo.id }}" class="form-control"
+                            value="{{ todo.text }}" required>
                     </div>
                     <div class="mb-3">
                         <label for="edit_priority_{{ todo.id }}" class="form-label">Öncelik</label>
                         <select name="priority" id="edit_priority_{{ todo.id }}" class="form-select">
-                            <option value="düşük" {% if todo.priority == 'düşük' %}selected{% endif %}>🟢 Düşük</option>
-                            <option value="orta" {% if todo.priority == 'orta' %}selected{% endif %}>🟡 Orta</option>
-                            <option value="yüksek" {% if todo.priority == 'yüksek' %}selected{% endif %}>🔴 Yüksek</option>
+                            <option value="düşük" {% if todo.priority=='düşük' %}selected{% endif %}>🟢 Düşük</option>
+                            <option value="orta" {% if todo.priority=='orta' %}selected{% endif %}>🟡 Orta</option>
+                            <option value="yüksek" {% if todo.priority=='yüksek' %}selected{% endif %}>🔴 Yüksek
+                            </option>
                         </select>
                     </div>
                     <div class="mb-3">
                         <label for="edit_description_{{ todo.id }}" class="form-label">Açıklama</label>
-                        <textarea name="description" id="edit_description_{{ todo.id }}" class="form-control" rows="2">{{ todo.description or '' }}</textarea>
+                        <textarea name="description" id="edit_description_{{ todo.id }}" class="form-control"
+                            rows="2">{{ todo.description or '' }}</textarea>
                     </div>
                     <button type="submit" class="btn btn-primary">Güncelle</button>
                 </form>

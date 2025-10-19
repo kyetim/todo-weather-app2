@@ -8,8 +8,13 @@ app = Flask(__name__)
 # In-memory storage
 todos = []
 todo_counter = 0
-categories = []
-category_counter = 0
+categories = [
+    {'id': 1, 'name': 'Genel', 'color': '#007bff'},
+    {'id': 2, 'name': 'İş', 'color': '#28a745'},
+    {'id': 3, 'name': 'Kişisel', 'color': '#ffc107'},
+    {'id': 4, 'name': 'Acil', 'color': '#dc3545'}
+]
+category_counter = 4
 
 # Weather API configuration
 WEATHER_API_KEY = os.environ.get('WEATHER_API_KEY', 'e73f50fbc7e75e1594e9c58d5a2f451e')
@@ -230,6 +235,10 @@ def add_category():
     
     if not name:
         return redirect(url_for('advanced_index'))
+    
+    # Ensure color starts with #
+    if not color.startswith('#'):
+        color = '#' + color
     
     category_counter += 1
     new_category = {
