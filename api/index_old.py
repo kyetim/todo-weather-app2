@@ -1,10 +1,12 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 import os
+from flask import Flask, jsonify, request, render_template, redirect, url_for, flash
 from datetime import datetime
 import requests
 
-# Initialize Flask app
+# Flask app initialization
 app = Flask(__name__)
+
+# Set secret key for sessions
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-here')
 
 # In-memory storage
@@ -371,6 +373,6 @@ def not_found_error(error):
 def internal_error(error):
     return render_template('500.html'), 500
 
-# For Vercel deployment
-if __name__ == '__main__':
-    app.run(debug=True)
+# Vercel WSGI handler
+def handler(environ, start_response):
+    return app(environ, start_response)
