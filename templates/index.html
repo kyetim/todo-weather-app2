@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}Ana Sayfa - Todo & Hava Durumu{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Todo Bölümü -->
+    <div class="col-lg-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">
+                    <i class="fas fa-list-check"></i> Todo Listesi
+                </h4>
+            </div>
+            <div class="card-body">
+                <!-- Todo Ekleme Formu -->
+                <form method="POST" action="{{ url_for('add_todo') }}" class="mb-4">
+                    <div class="input-group">
+                        <input type="text" name="todo" class="form-control" 
+                               placeholder="Yeni todo ekle..." required>
+                        <button class="btn btn-success" type="submit">
+                            <i class="fas fa-plus"></i> Ekle
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Todo Listesi -->
+                {% if todos %}
+                    <div class="list-group">
+                        {% for todo in todos %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center 
+                                        {% if todo.completed %}bg-light text-muted{% endif %}">
+                                <div class="d-flex align-items-center">
+                                    <form method="GET" action="{{ url_for('complete_todo', todo_id=todo.id) }}" 
+                                          class="me-2">
+                                        <button type="submit" class="btn btn-sm 
+                                            {% if todo.completed %}btn-outline-success{% else %}btn-outline-secondary{% endif %}">
+                                            <i class="fas fa-{% if todo.completed %}check{% else %}circle{% endif %}"></i>
+                                        </button>
+                                    </form>
+                                    <div>
+                                        <span class="{% if todo.completed %}text-decoration-line-through{% endif %}">
+                                            {{ todo.text }}
+                                        </span>
+                                        <small class="text-muted d-block">{{ todo.created_at }}</small>
+                                    </div>
+                                </div>
+                                <a href="{{ url_for('delete_todo', todo_id=todo.id) }}" 
+                                   class="btn btn-sm btn-outline-danger"
+                                   onclick="return confirm('Bu todo\'yu silmek istediğinizden emin misiniz?')">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-clipboard-list fa-3x mb-3"></i>
+                        <p>Henüz todo eklenmemiş. Yukarıdaki formu kullanarak ilk todo'nuzu ekleyin!</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Hava Durumu Bölümü -->
+    <div class="col-lg-4">
+        <div class="card shadow">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-cloud-sun"></i> Hava Durumu
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- Şehir Arama -->
+                <form method="GET" class="mb-3">
+                    <div class="input-group">
+                        <input type="text" name="city" class="form-control" 
+                               placeholder="Şehir adı..." value="{{ current_city }}">
+                        <button type="submit" class="btn btn-outline-info">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </form>
+
+                {% if weather %}
+                    <div class="text-center">
+                        <h3>{{ weather.city }}</h3>
+                        <div class="weather-icon mb-3">
+                            <img src="http://openweathermap.org/img/wn/{{ weather.icon }}@2x.png" 
+                                 alt="Hava durumu" class="img-fluid">
+                        </div>
+                        <h2 class="text-primary">{{ weather.temperature }}°C</h2>
+                        <p class="text-capitalize">{{ weather.description }}</p>
+                        <small class="text-muted">
+                            Nem: %{{ weather.humidity }}
+                        </small>
+                    </div>
+                {% else %}
+                    <div class="text-center text-muted">
+                        <i class="fas fa-cloud fa-3x mb-3"></i>
+                        <p>Hava durumu bilgisi alınamadı.</p>
+                        <p><small>Şehir adını kontrol edin veya internet bağlantınızı kontrol edin.</small></p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- İstatistikler -->
+        <div class="card shadow mt-3">
+            <div class="card-header bg-success text-white">
+                <h6 class="mb-0">
+                    <i class="fas fa-chart-bar"></i> İstatistikler
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6">
+                        <h4 class="text-primary">{{ todos|length }}</h4>
+                        <small class="text-muted">Toplam Todo</small>
+                    </div>
+                    <div class="col-6">
+                        <h4 class="text-success">{{ todos|selectattr('completed')|list|length }}</h4>
+                        <small class="text-muted">Tamamlanan</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

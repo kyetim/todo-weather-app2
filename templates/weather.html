@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Hava Durumu - Todo & Hava Durumu{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow">
+            <div class="card-header bg-info text-white">
+                <h4 class="mb-0">
+                    <i class="fas fa-cloud-sun"></i> Detaylı Hava Durumu
+                </h4>
+            </div>
+            <div class="card-body">
+                <!-- Şehir Arama -->
+                <form method="GET" class="mb-4">
+                    <div class="input-group input-group-lg">
+                        <input type="text" name="city" class="form-control" 
+                               placeholder="Şehir adı girin..." value="{{ current_city }}">
+                        <button type="submit" class="btn btn-info">
+                            <i class="fas fa-search"></i> Hava Durumunu Getir
+                        </button>
+                    </div>
+                </form>
+
+                {% if weather %}
+                    <div class="weather-details text-center">
+                        <h2 class="mb-3">{{ weather.city }}</h2>
+                        
+                        <div class="row align-items-center mb-4">
+                            <div class="col-md-6">
+                                <img src="http://openweathermap.org/img/wn/{{ weather.icon }}@4x.png" 
+                                     alt="Hava durumu" class="img-fluid weather-large-icon">
+                            </div>
+                            <div class="col-md-6">
+                                <h1 class="display-4 text-primary">{{ weather.temperature }}°C</h1>
+                                <h4 class="text-capitalize text-muted">{{ weather.description }}</h4>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-tint fa-2x text-info mb-2"></i>
+                                        <h5>Nem Oranı</h5>
+                                        <h3 class="text-info">{{ weather.humidity }}%</h3>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-thermometer-half fa-2x text-warning mb-2"></i>
+                                        <h5>Sıcaklık</h5>
+                                        <h3 class="text-warning">{{ weather.temperature }}°C</h3>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            <a href="{{ url_for('index') }}" class="btn btn-primary">
+                                <i class="fas fa-arrow-left"></i> Ana Sayfaya Dön
+                            </a>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-cloud fa-5x mb-4"></i>
+                        <h4>Hava Durumu Bilgisi Bulunamadı</h4>
+                        <p>Lütfen geçerli bir şehir adı girin veya internet bağlantınızı kontrol edin.</p>
+                        <p><small>Örnek şehirler: İstanbul, Ankara, İzmir, Bursa, Antalya</small></p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
