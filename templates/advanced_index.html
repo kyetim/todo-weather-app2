@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+
+{% block title %}Gelişmiş Todo Yönetimi - Todo & Hava Durumu{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Gelişmiş Todo Bölümü -->
+    <div class="col-lg-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">
+                    <i class="fas fa-list-check"></i> Gelişmiş Todo Yönetimi
+                </h4>
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#categoryModal">
+                        <i class="fas fa-tags"></i> Kategoriler
+                    </button>
+                    <button type="button" class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#searchModal">
+                        <i class="fas fa-search"></i> Ara
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Gelişmiş Todo Ekleme Formu -->
+                <form method="POST" action="{{ url_for('add_advanced_todo') }}" class="mb-4">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="todo_text" class="form-label">Todo Metni</label>
+                            <input type="text" name="todo" id="todo_text" class="form-control" 
+                                   placeholder="Yeni todo ekle..." required>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="priority" class="form-label">Öncelik</label>
+                            <select name="priority" id="priority" class="form-select">
+                                <option value="düşük">🟢 Düşük Öncelik</option>
+                                <option value="orta" selected>🟡 Orta Öncelik</option>
+                                <option value="yüksek">🔴 Yüksek Öncelik</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="category" class="form-label">Kategori</label>
+                            <select name="category_id" id="category" class="form-select">
+                                <option value="">Kategori Seçin</option>
+                                {% for category in categories %}
+                                    <option value="{{ category.id }}" style="color: {{ category.color }}">
+                                        {{ category.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="description" class="form-label">Açıklama</label>
+                            <textarea name="description" id="description" class="form-control" 
+                                      placeholder="Todo açıklaması (opsiyonel)" rows="2"></textarea>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="due_date" class="form-label">Bitiş Tarihi</label>
+                            <input type="datetime-local" name="due_date" id="due_date" class="form-control">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="tags" class="form-label">Etiketler</label>
+                            <input type="text" name="tags" id="tags" class="form-control" 
+                                   placeholder="etiket1, etiket2, etiket3">
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-plus"></i> Gelişmiş Todo Ekle
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Gelişmiş Filtreler -->
+                <div class="mb-3">
+                    <div class="btn-group flex-wrap" role="group">
+                        <a href="{{ url_for('index') }}" class="btn btn-outline-primary">
+                            <i class="fas fa-list"></i> Tümü
+                        </a>
+                        <a href="{{ url_for('index', filter='yüksek') }}" class="btn btn-outline-danger">
+                            🔴 Yüksek
+                        </a>
+                        <a href="{{ url_for('index', filter='orta') }}" class="btn btn-outline-warning">
+                            🟡 Orta
+                        </a>
+                        <a href="{{ url_for('index', filter='düşük') }}" class="btn btn-outline-success">
+                            🟢 Düşük
+                        </a>
+                        <a href="{{ url_for('index', filter='overdue') }}" class="btn btn-outline-dark">
+                            ⏰ Süresi Geçmiş
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Gelişmiş Todo Listesi -->
+                {% if todos %}
+                    <div class="list-group">
+                        {% for todo in todos %}
+                            <div class="list-group-item priority-{{ todo.priority }} d-flex justify-content-between align-items-center 
+                                        {% if todo.completed %}bg-light text-muted{% endif %}
+                                        {% if todo.is_overdue() %}border-danger{% endif %}">
+                                <div class="d-flex align-items-center flex-grow-1">
+                                    <form method="GET" action="{{ url_for('complete_todo', todo_id=todo.id) }}" 
+                                          class="me-2">
+                                        <button type="submit" class="btn btn-sm 
+                                            {% if todo.completed %}btn-outline-success{% else %}btn-outline-secondary{% endif %}">
+                                            <i class="fas fa-{% if todo.completed %}check{% else %}circle{% endif %}"></i>
+                                        </button>
+                                    </form>
+                                    <div class="flex-grow-1">
+                                        <div class="d-flex align-items-center flex-wrap">
+                                            <span class="{% if todo.completed %}text-decoration-line-through{% endif %} me-2">
+                                                {{ todo.text }}
+                                            </span>
+                                            <span class="priority-badge priority-{{ todo.priority }}">
+                                                {% if todo.priority == 'yüksek' %}
+                                                    🔴 Yüksek
+                                                {% elif todo.priority == 'orta' %}
+                                                    🟡 Orta
+                                                {% else %}
+                                                    🟢 Düşük
+                                                {% endif %}
+                                            </span>
+                                            {% if todo.category %}
+                                                <span class="badge" style="background-color: {{ todo.category.color }}">
+                                                    {{ todo.category.name }}
+                                                </span>
+                                            {% endif %}
+                                            {% if todo.is_overdue() %}
+                                                <span class="badge bg-danger">⏰ Süresi Geçmiş</span>
+                                            {% endif %}
+                                        </div>
+                                        {% if todo.description %}
+                                            <small class="text-muted d-block">{{ todo.description }}</small>
+                                        {% endif %}
+                                        {% if todo.tags %}
+                                            <div class="mt-1">
+                                                {% for tag in todo.tags %}
+                                                    <span class="badge bg-secondary me-1">{{ tag }}</span>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                        <small class="text-muted">
+                                            {{ todo.created_at.strftime('%d.%m.%Y %H:%M') }}
+                                            {% if todo.due_date %}
+                                                | Bitiş: {{ todo.due_date.strftime('%d.%m.%Y %H:%M') }}
+                                            {% endif %}
+                                        </small>
+                                    </div>
+                                </div>
+                                <div class="btn-group">
+                                    <button type="button" class="btn btn-sm btn-outline-info" 
+                                            data-bs-toggle="modal" data-bs-target="#editModal{{ todo.id }}">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <a href="{{ url_for('delete_todo', todo_id=todo.id) }}" 
+                                       class="btn btn-sm btn-outline-danger"
+                                       onclick="return confirm('Bu todo\'yu silmek istediğinizden emin misiniz?')">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-clipboard-list fa-3x mb-3"></i>
+                        <p>Henüz todo eklenmemiş. Yukarıdaki formu kullanarak ilk todo'nuzu ekleyin!</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Gelişmiş İstatistikler -->
+    <div class="col-lg-4">
+        <div class="card shadow">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-bar"></i> Gelişmiş İstatistikler
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center mb-3">
+                    <div class="col-6">
+                        <h4 class="text-primary">{{ stats.total }}</h4>
+                        <small class="text-muted">Toplam Todo</small>
+                    </div>
+                    <div class="col-6">
+                        <h4 class="text-success">{{ stats.completed }}</h4>
+                        <small class="text-muted">Tamamlanan</small>
+                    </div>
+                </div>
+                
+                <div class="row text-center mb-3">
+                    <div class="col-6">
+                        <h4 class="text-warning">{{ stats.pending }}</h4>
+                        <small class="text-muted">Bekleyen</small>
+                    </div>
+                    <div class="col-6">
+                        <h4 class="text-danger">{{ stats.overdue }}</h4>
+                        <small class="text-muted">Süresi Geçmiş</small>
+                    </div>
+                </div>
+                
+                <div class="progress mb-3">
+                    <div class="progress-bar" role="progressbar" 
+                         style="width: {{ stats.completion_rate }}%">
+                        {{ stats.completion_rate }}%
+                    </div>
+                </div>
+                
+                <div class="row text-center">
+                    <div class="col-4">
+                        <h6 class="text-danger">{{ stats.high_priority }}</h6>
+                        <small class="text-muted">Yüksek</small>
+                    </div>
+                    <div class="col-4">
+                        <h6 class="text-warning">{{ stats.medium_priority }}</h6>
+                        <small class="text-muted">Orta</small>
+                    </div>
+                    <div class="col-4">
+                        <h6 class="text-success">{{ stats.low_priority }}</h6>
+                        <small class="text-muted">Düşük</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hava Durumu Bölümü -->
+        <div class="card shadow mt-3">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-cloud-sun"></i> Hava Durumu
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- Şehir Arama -->
+                <form method="GET" class="mb-3">
+                    <div class="input-group">
+                        <input type="text" name="city" class="form-control" 
+                               placeholder="Şehir adı..." value="{{ current_city }}">
+                        <button type="submit" class="btn btn-outline-info">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </form>
+
+                {% if weather %}
+                    <div class="text-center">
+                        <h3>{{ weather.city }}</h3>
+                        <div class="weather-icon mb-3">
+                            <img src="http://openweathermap.org/img/wn/{{ weather.icon }}@2x.png" 
+                                 alt="Hava durumu" class="img-fluid">
+                        </div>
+                        <h2 class="text-primary">{{ weather.temperature }}°C</h2>
+                        <p class="text-capitalize">{{ weather.description }}</p>
+                        <small class="text-muted">
+                            Nem: %{{ weather.humidity }}
+                        </small>
+                    </div>
+                {% else %}
+                    <div class="text-center text-muted">
+                        <i class="fas fa-cloud fa-3x mb-3"></i>
+                        <p>Hava durumu bilgisi alınamadı.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Kategori Modal -->
+<div class="modal fade" id="categoryModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Kategori Yönetimi</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form method="POST" action="{{ url_for('add_category') }}">
+                    <div class="mb-3">
+                        <label for="category_name" class="form-label">Kategori Adı</label>
+                        <input type="text" name="name" id="category_name" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="category_color" class="form-label">Renk</label>
+                        <input type="color" name="color" id="category_color" class="form-control" value="#007bff">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Kategori Ekle</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Arama Modal -->
+<div class="modal fade" id="searchModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Todo Arama</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form method="GET" action="{{ url_for('search_todos') }}">
+                    <div class="mb-3">
+                        <label for="search_query" class="form-label">Arama Terimi</label>
+                        <input type="text" name="q" id="search_query" class="form-control" 
+                               placeholder="Todo metni, açıklama veya etiket ara..." required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Ara</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

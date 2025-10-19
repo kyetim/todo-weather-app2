@@ -15,13 +15,13 @@
                 <form method="POST">
                     <div class="mb-3">
                         <label for="username" class="form-label">Kullanıcı Adı</label>
-                        <input type="text" class="form-control" id="username" name="username" 
-                               placeholder="Kullanıcı adınızı girin" required>
+                        <input type="text" class="form-control" id="username" name="username"
+                            placeholder="Kullanıcı adınızı girin" required>
                     </div>
                     <div class="mb-3">
                         <label for="email" class="form-label">E-posta (Opsiyonel)</label>
-                        <input type="email" class="form-control" id="email" name="email" 
-                               placeholder="E-posta adresiniz (opsiyonel)">
+                        <input type="email" class="form-control" id="email" name="email"
+                            placeholder="E-posta adresiniz (opsiyonel)">
                     </div>
                     <div class="d-grid">
                         <button type="submit" class="btn btn-primary">
@@ -29,17 +29,17 @@
                         </button>
                     </div>
                 </form>
-                
+
                 <div class="mt-4 text-center">
                     <small class="text-muted">
-                        <i class="fas fa-info-circle"></i> 
+                        <i class="fas fa-info-circle"></i>
                         Kullanıcı adınız yoksa otomatik olarak oluşturulacaktır.
                     </small>
                 </div>
             </div>
         </div>
     </div>
-    
+
     <!-- Hava Durumu Bölümü -->
     <div class="col-lg-4">
         <div class="card shadow">
@@ -52,8 +52,8 @@
                 <!-- Şehir Arama -->
                 <form method="GET" class="mb-3">
                     <div class="input-group">
-                        <input type="text" name="city" class="form-control" 
-                               placeholder="Şehir adı..." value="{{ current_city }}">
+                        <input type="text" name="city" class="form-control" placeholder="Şehir adı..."
+                            value="{{ current_city }}">
                         <button type="submit" class="btn btn-outline-info">
                             <i class="fas fa-search"></i>
                         </button>
@@ -61,23 +61,23 @@
                 </form>
 
                 {% if weather %}
-                    <div class="text-center">
-                        <h3>{{ weather.city }}</h3>
-                        <div class="weather-icon mb-3">
-                            <img src="http://openweathermap.org/img/wn/{{ weather.icon }}@2x.png" 
-                                 alt="Hava durumu" class="img-fluid">
-                        </div>
-                        <h2 class="text-primary">{{ weather.temperature }}°C</h2>
-                        <p class="text-capitalize">{{ weather.description }}</p>
-                        <small class="text-muted">
-                            Nem: %{{ weather.humidity }}
-                        </small>
+                <div class="text-center">
+                    <h3>{{ weather.city }}</h3>
+                    <div class="weather-icon mb-3">
+                        <img src="http://openweathermap.org/img/wn/{{ weather.icon }}@2x.png" alt="Hava durumu"
+                            class="img-fluid">
                     </div>
+                    <h2 class="text-primary">{{ weather.temperature }}°C</h2>
+                    <p class="text-capitalize">{{ weather.description }}</p>
+                    <small class="text-muted">
+                        Nem: %{{ weather.humidity }}
+                    </small>
+                </div>
                 {% else %}
-                    <div class="text-center text-muted">
-                        <i class="fas fa-cloud fa-3x mb-3"></i>
-                        <p>Hava durumu bilgisi alınamadı.</p>
-                    </div>
+                <div class="text-center text-muted">
+                    <i class="fas fa-cloud fa-3x mb-3"></i>
+                    <p>Hava durumu bilgisi alınamadı.</p>
+                </div>
                 {% endif %}
             </div>
         </div>
