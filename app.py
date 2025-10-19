@@ -10,6 +10,12 @@ import json
 from models import Todo, WeatherData, TodoManager
 from utils import get_priority_order, get_weather_data, format_datetime, validate_todo_text, get_todo_statistics
 from config import config
+from database import db_manager
+from auth import (
+    login_required, get_current_user, login_user, logout_user, 
+    is_logged_in, get_user_todos, create_user_todo, update_user_todo, 
+    delete_user_todo, toggle_user_todo, get_user_todos_by_priority, get_user_statistics
+)
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-here'
@@ -104,10 +110,14 @@ def index():
     # Hava durumu verilerini al (OOP kullanarak)
     weather_data = get_weather_data(city, app.config['WEATHER_API_KEY'])
     
-    # Todo'ları filtrele (list comprehension kullanarak)
-    all_todos = todo_manager.get_all_todos()
+    # Kullanıcı giriş kontrolü
+    if not is_logged_in():
+        return render_template('login.html', weather=weather_data, current_city=city)
+    
+    # Todo'ları veritabanından al (PostgreSQL)
+    all_todos = get_user_todos()
     filtered_todos = (
-        todo_manager.get_todos_by_priority(filter_priority) 
+        get_user_todos_by_priority(filter_priority) 
         if filter_priority 
         else all_todos
     )
@@ -115,11 +125,11 @@ def index():
     # Todo'ları öncelik sırasına göre sırala (lambda fonksiyonu)
     sorted_todos = sorted(
         filtered_todos, 
-        key=lambda x: (get_priority_order(x.get('priority', 'orta')), x['id'])
+        key=lambda x: (get_priority_order(x.get('priority', 'orta')), x['created_at'])
     )
     
-    # İstatistikleri hesapla (OOP method kullanarak)
-    stats = get_todo_statistics(all_todos)
+    # İstatistikleri hesapla (veritabanından)
+    stats = get_user_statistics()
     
     return render_template(
         'index.html', 
@@ -127,15 +137,17 @@ def index():
         weather=weather_data, 
         current_city=city, 
         current_filter=filter_priority,
-        stats=stats
+        stats=stats,
+        user=get_current_user()
     )
 
 @app.route('/add', methods=['POST'])
 @handle_errors
 @require_method('POST')
 @validate_input(['todo'])
+@login_required
 def add_todo():
-    """Yeni todo ekle - OOP kullanarak"""
+    """Yeni todo ekle - Veritabanı ile"""
     todo_text = request.form.get('todo')
     priority = request.form.get('priority', 'orta')
     
@@ -144,32 +156,63 @@ def add_todo():
         flash('Todo metni 2-500 karakter arasında olmalıdır!', 'error')
         return redirect(url_for('index'))
     
-    # OOP kullanarak todo ekle
-    new_todo = todo_manager.add_todo(todo_text, priority)
+    # Veritabanına todo ekle (PostgreSQL)
+    new_todo = create_user_todo(todo_text, priority)
     
-    flash(f'Todo başarıyla eklendi! (ID: {new_todo.id})', 'success')
-    return redirect(url_for('index'))
-
-@app.route('/complete/<int:todo_id>')
-@handle_errors
-def complete_todo(todo_id):
-    """Todo'yu tamamla/tamamlanmamış yap - OOP kullanarak"""
-    todo = todo_manager.get_todo(todo_id)
-    if todo:
-        todo.toggle_complete()  # OOP method kullanarak
-        flash(f'Todo {"tamamlandı" if todo.completed else "tamamlanmamış yapıldı"}!', 'success')
+    if new_todo:
+        flash(f'Todo başarıyla eklendi!', 'success')
     else:
-        flash('Todo bulunamadı!', 'error')
+        flash('Todo eklenirken hata oluştu!', 'error')
+    
     return redirect(url_for('index'))
 
-@app.route('/delete/<int:todo_id>')
+@app.route('/complete/<string:todo_id>')
 @handle_errors
+@login_required
+def complete_todo(todo_id):
+    """Todo'yu tamamla/tamamlanmamış yap - Veritabanı ile"""
+    if toggle_user_todo(todo_id):
+        flash('Todo durumu güncellendi!', 'success')
+    else:
+        flash('Todo bulunamadı veya güncellenemedi!', 'error')
+    return redirect(url_for('index'))
+
+@app.route('/delete/<string:todo_id>')
+@handle_errors
+@login_required
 def delete_todo(todo_id):
-    """Todo'yu sil - OOP kullanarak"""
-    if todo_manager.delete_todo(todo_id):
+    """Todo'yu sil - Veritabanı ile"""
+    if delete_user_todo(todo_id):
         flash('Todo başarıyla silindi!', 'info')
     else:
-        flash('Todo bulunamadı!', 'error')
+        flash('Todo bulunamadı veya silinemedi!', 'error')
+    return redirect(url_for('index'))
+
+@app.route('/login', methods=['GET', 'POST'])
+@handle_errors
+def login():
+    """Kullanıcı giriş sayfası"""
+    if request.method == 'POST':
+        username = request.form.get('username')
+        email = request.form.get('email')
+        
+        if not username:
+            flash('Kullanıcı adı gerekli!', 'error')
+            return render_template('login.html')
+        
+        if login_user(username, email):
+            flash(f'Hoş geldiniz, {username}!', 'success')
+            return redirect(url_for('index'))
+        else:
+            flash('Giriş yapılamadı!', 'error')
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+@handle_errors
+def logout():
+    """Kullanıcı çıkış"""
+    logout_user()
     return redirect(url_for('index'))
 
 @app.route('/weather')
