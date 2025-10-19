@@ -371,6 +371,9 @@ def not_found_error(error):
 def internal_error(error):
     return render_template('500.html'), 500
 
-# For Vercel deployment
+# Export app for Vercel
+handler = app
+
+# For local development
 if __name__ == '__main__':
     app.run(debug=True)
