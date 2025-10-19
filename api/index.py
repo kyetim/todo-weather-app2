@@ -1,12 +1,15 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template, redirect, url_for, flash
 import os
 from datetime import datetime
+import requests
 
 app = Flask(__name__)
 
 # In-memory storage
 todos = []
 todo_counter = 0
+categories = []
+category_counter = 0
 
 # Weather API configuration
 WEATHER_API_KEY = os.environ.get('WEATHER_API_KEY', 'e73f50fbc7e75e1594e9c58d5a2f451e')
@@ -23,7 +26,6 @@ def get_weather(city):
         }
     
     try:
-        import requests
         params = {
             'q': city,
             'appid': WEATHER_API_KEY,
@@ -46,20 +48,250 @@ def get_weather(city):
     except:
         return None
 
+def get_priority_order(priority):
+    priority_map = {'yüksek': 1, 'orta': 2, 'düşük': 3}
+    return priority_map.get(priority, 2)
+
+def validate_todo_text(text):
+    return 2 <= len(text) <= 500
+
+def get_todo_statistics():
+    total = len(todos)
+    completed = len([todo for todo in todos if todo.get('completed', False)])
+    pending = total - completed
+    
+    high_priority = len([todo for todo in todos if todo.get('priority') == 'yüksek'])
+    medium_priority = len([todo for todo in todos if todo.get('priority') == 'orta'])
+    low_priority = len([todo for todo in todos if todo.get('priority') == 'düşük'])
+    
+    # Süresi geçmiş todo'ları hesapla
+    overdue = 0
+    for todo in todos:
+        if todo.get('due_date'):
+            try:
+                due_date = datetime.strptime(todo['due_date'], '%Y-%m-%dT%H:%M')
+                if due_date < datetime.now() and not todo.get('completed', False):
+                    overdue += 1
+            except:
+                pass
+    
+    return {
+        'total': total,
+        'completed': completed,
+        'pending': pending,
+        'completion_rate': round((completed / total * 100), 1) if total > 0 else 0,
+        'high_priority': high_priority,
+        'medium_priority': medium_priority,
+        'low_priority': low_priority,
+        'overdue': overdue
+    }
+
 @app.route('/')
 def index():
-    return jsonify({
-        'message': 'Todo & Hava Durumu API',
-        'status': 'working',
-        'endpoints': {
-            'todos': '/api/todos',
-            'weather': '/api/weather/<city>',
-            'add_todo': '/api/todos (POST)'
-        }
-    })
+    city = request.args.get('city', 'Istanbul')
+    filter_priority = request.args.get('filter')
+    
+    weather_data = get_weather(city)
+    
+    # Todo'ları filtrele
+    filtered_todos = todos
+    if filter_priority:
+        if filter_priority == 'overdue':
+            # Süresi geçmiş todo'ları filtrele
+            filtered_todos = []
+            for todo in todos:
+                if todo.get('due_date'):
+                    try:
+                        due_date = datetime.strptime(todo['due_date'], '%Y-%m-%dT%H:%M')
+                        if due_date < datetime.now() and not todo.get('completed', False):
+                            filtered_todos.append(todo)
+                    except:
+                        pass
+        else:
+            filtered_todos = [todo for todo in todos if todo.get('priority') == filter_priority]
+    
+    # Todo'ları öncelik sırasına göre sırala
+    sorted_todos = sorted(
+        filtered_todos, 
+        key=lambda x: (get_priority_order(x.get('priority', 'orta')), x.get('created_at', ''))
+    )
+    
+    # İstatistikleri hesapla
+    stats = get_todo_statistics()
+    
+    return render_template(
+        'index.html', 
+        todos=sorted_todos, 
+        weather=weather_data, 
+        current_city=city, 
+        current_filter=filter_priority,
+        stats=stats,
+        user=None
+    )
 
+@app.route('/advanced')
+def advanced_index():
+    city = request.args.get('city', 'Istanbul')
+    filter_priority = request.args.get('filter')
+    
+    weather_data = get_weather(city)
+    
+    # Todo'ları filtrele
+    filtered_todos = todos
+    if filter_priority:
+        if filter_priority == 'overdue':
+            filtered_todos = []
+            for todo in todos:
+                if todo.get('due_date'):
+                    try:
+                        due_date = datetime.strptime(todo['due_date'], '%Y-%m-%dT%H:%M')
+                        if due_date < datetime.now() and not todo.get('completed', False):
+                            filtered_todos.append(todo)
+                    except:
+                        pass
+        else:
+            filtered_todos = [todo for todo in todos if todo.get('priority') == filter_priority]
+    
+    # Todo'ları öncelik sırasına göre sırala
+    sorted_todos = sorted(
+        filtered_todos, 
+        key=lambda x: (get_priority_order(x.get('priority', 'orta')), x.get('created_at', ''))
+    )
+    
+    # İstatistikleri hesapla
+    stats = get_todo_statistics()
+    
+    return render_template(
+        'advanced_index.html', 
+        todos=sorted_todos, 
+        weather=weather_data, 
+        current_city=city, 
+        current_filter=filter_priority,
+        stats=stats,
+        categories=categories,
+        user=None
+    )
+
+@app.route('/add', methods=['POST'])
+def add_todo():
+    global todo_counter
+    todo_text = request.form.get('todo')
+    priority = request.form.get('priority', 'orta')
+    
+    if not validate_todo_text(todo_text):
+        return redirect(url_for('index'))
+    
+    todo_counter += 1
+    new_todo = {
+        'id': todo_counter,
+        'text': todo_text,
+        'priority': priority,
+        'completed': False,
+        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
+    }
+    
+    todos.append(new_todo)
+    return redirect(url_for('index'))
+
+@app.route('/add_advanced_todo', methods=['POST'])
+def add_advanced_todo():
+    global todo_counter
+    todo_text = request.form.get('todo')
+    priority = request.form.get('priority', 'orta')
+    category_id = request.form.get('category_id')
+    description = request.form.get('description', '')
+    due_date = request.form.get('due_date')
+    tags = request.form.get('tags', '')
+    
+    if not validate_todo_text(todo_text):
+        return redirect(url_for('advanced_index'))
+    
+    todo_counter += 1
+    new_todo = {
+        'id': todo_counter,
+        'text': todo_text,
+        'priority': priority,
+        'completed': False,
+        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+        'description': description,
+        'due_date': due_date,
+        'tags': [tag.strip() for tag in tags.split(',') if tag.strip()],
+        'category_id': int(category_id) if category_id else None
+    }
+    
+    todos.append(new_todo)
+    return redirect(url_for('advanced_index'))
+
+@app.route('/add_category', methods=['POST'])
+def add_category():
+    global category_counter
+    name = request.form.get('name')
+    color = request.form.get('color', '#007bff')
+    
+    if not name:
+        return redirect(url_for('advanced_index'))
+    
+    category_counter += 1
+    new_category = {
+        'id': category_counter,
+        'name': name,
+        'color': color
+    }
+    
+    categories.append(new_category)
+    return redirect(url_for('advanced_index'))
+
+@app.route('/search_todos')
+def search_todos():
+    query = request.args.get('q', '')
+    if not query:
+        return redirect(url_for('advanced_index'))
+    
+    # Basit arama - todo metninde, açıklamada ve etiketlerde ara
+    filtered_todos = []
+    for todo in todos:
+        if (query.lower() in todo.get('text', '').lower() or
+            query.lower() in todo.get('description', '').lower() or
+            any(query.lower() in tag.lower() for tag in todo.get('tags', []))):
+            filtered_todos.append(todo)
+    
+    stats = get_todo_statistics()
+    
+    return render_template(
+        'advanced_index.html', 
+        todos=filtered_todos, 
+        weather=None, 
+        current_city='Istanbul', 
+        current_filter=None,
+        stats=stats,
+        categories=categories,
+        user=None,
+        search_query=query
+    )
+
+@app.route('/complete/<int:todo_id>')
+def complete_todo(todo_id):
+    for todo in todos:
+        if todo['id'] == todo_id:
+            todo['completed'] = not todo['completed']
+            break
+    return redirect(url_for('index'))
+
+@app.route('/delete/<int:todo_id>')
+def delete_todo(todo_id):
+    global todos
+    todos = [todo for todo in todos if todo['id'] != todo_id]
+    return redirect(url_for('index'))
+
+@app.route('/weather')
+def weather():
+    city = request.args.get('city', 'Istanbul')
+    weather_data = get_weather(city)
+    return render_template('weather.html', weather=weather_data, current_city=city)
+
+# JSON API Endpoints
 @app.route('/api/todos', methods=['GET'])
-def get_todos():
+def api_get_todos():
     return jsonify({
         'success': True,
         'data': todos,
@@ -67,7 +299,7 @@ def get_todos():
     })
 
 @app.route('/api/todos', methods=['POST'])
-def create_todo():
+def api_create_todo():
     global todo_counter
     
     data = request.get_json()
@@ -91,37 +323,8 @@ def create_todo():
         'data': new_todo
     }), 201
 
-@app.route('/api/todos/<int:todo_id>', methods=['PUT'])
-def update_todo(todo_id):
-    todo = next((t for t in todos if t['id'] == todo_id), None)
-    if not todo:
-        return jsonify({'success': False, 'error': 'Todo not found'}), 404
-    
-    data = request.get_json()
-    if 'text' in data:
-        todo['text'] = data['text']
-    if 'priority' in data:
-        todo['priority'] = data['priority']
-    if 'completed' in data:
-        todo['completed'] = data['completed']
-    
-    return jsonify({
-        'success': True,
-        'data': todo
-    })
-
-@app.route('/api/todos/<int:todo_id>', methods=['DELETE'])
-def delete_todo(todo_id):
-    global todos
-    original_length = len(todos)
-    todos = [t for t in todos if t['id'] != todo_id]
-    
-    if len(todos) < original_length:
-        return jsonify({'success': True, 'message': 'Todo deleted'})
-    return jsonify({'success': False, 'error': 'Todo not found'}), 404
-
 @app.route('/api/weather/<city>')
-def get_weather_api(city):
+def api_get_weather(city):
     weather_data = get_weather(city)
     if weather_data:
         return jsonify({
@@ -132,6 +335,22 @@ def get_weather_api(city):
         'success': False,
         'error': 'Weather data not found'
     }), 404
+
+@app.context_processor
+def inject_global_vars():
+    return {
+        'app_name': 'Todo & Hava Durumu',
+        'version': '1.0.0',
+        'current_year': datetime.now().year
+    }
+
+@app.errorhandler(404)
+def not_found_error(error):
+    return render_template('404.html'), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    return render_template('500.html'), 500
 
 # Vercel handler
 handler = app

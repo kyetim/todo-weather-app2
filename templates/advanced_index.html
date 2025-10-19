@@ -103,7 +103,7 @@
                     {% for todo in todos %}
                     <div class="list-group-item priority-{{ todo.priority }} d-flex justify-content-between align-items-center 
                                         {% if todo.completed %}bg-light text-muted{% endif %}
-                                        {% if todo.is_overdue() %}border-danger{% endif %}">
+                                        {% if todo.due_date and not todo.completed %}border-danger{% endif %}">
                         <div class="d-flex align-items-center flex-grow-1">
                             <form method="GET" action="{{ url_for('complete_todo', todo_id=todo.id) }}" class="me-2">
                                 <button type="submit"
@@ -131,7 +131,7 @@
                                         {{ todo.category.name }}
                                     </span>
                                     {% endif %}
-                                    {% if todo.is_overdue() %}
+                                    {% if todo.due_date and not todo.completed %}
                                     <span class="badge bg-danger">⏰ Süresi Geçmiş</span>
                                     {% endif %}
                                 </div>
@@ -146,9 +146,9 @@
                                 </div>
                                 {% endif %}
                                 <small class="text-muted">
-                                    {{ todo.created_at.strftime('%d.%m.%Y %H:%M') }}
+                                    {{ todo.created_at }}
                                     {% if todo.due_date %}
-                                    | Bitiş: {{ todo.due_date.strftime('%d.%m.%Y %H:%M') }}
+                                    | Bitiş: {{ todo.due_date }}
                                     {% endif %}
                                 </small>
                             </div>
