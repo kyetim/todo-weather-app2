@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
 import os
 from datetime import datetime
+from supabase import create_client, Client
 import requests
 
 # Point Flask to project-level templates and static directories using absolute paths
@@ -15,6 +16,36 @@ app = Flask(
     static_url_path='/static'
 )
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-here')
+
+# Supabase client (env-only; no fallbacks)
+RAW_SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+RAW_SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
+
+def _normalize_url(url: str) -> str:
+    return url[1:] if url.startswith('@') else url
+
+SUPABASE_URL = _normalize_url(RAW_SUPABASE_URL)
+SUPABASE_ANON_KEY = RAW_SUPABASE_ANON_KEY
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY) if SUPABASE_URL and SUPABASE_ANON_KEY else None
+
+# Helpers for Supabase
+def get_or_create_user(username: str) -> str:
+    # Try find
+    res = supabase.table('users').select('id').eq('username', username).limit(1).execute()
+    rows = res.data or []
+    if rows:
+        return rows[0]['id']
+    # Insert
+    res = supabase.table('users').insert({'username': username}).execute()
+    return (res.data or [{}])[0].get('id')
+
+def fetch_user_todos(user_id: str):
+    res = supabase.table('todos').select('*').eq('user_id', user_id).order('created_at').execute()
+    return res.data or []
+
+def fetch_user_categories(user_id: str):
+    res = supabase.table('categories').select('*').eq('user_id', user_id).order('created_at').execute()
+    return res.data or []
 
 # In-memory user store: username -> per-user state
 USERS = {}
@@ -134,18 +165,22 @@ def index():
     if gate:
         return gate
     username = get_current_username()
-    ensure_user(username)
-    user_state = USERS[username]
+    user_id = session.get('user_id')
+    if not supabase:
+        ensure_user(username)
+        user_state = USERS[username]
+    else:
+        user_state = None
     try:
         city = request.args.get('city', 'Istanbul')
         filter_priority = request.args.get('filter')
         weather_data = get_weather(city)
 
-        filtered_todos = user_state['todos']
+        filtered_todos = fetch_user_todos(user_id) if supabase else user_state['todos']
         if filter_priority:
             if filter_priority == 'overdue':
                 filtered_todos = []
-                for todo in user_state['todos']:
+                for todo in filtered_todos:
                     if todo.get('due_date'):
                         try:
                             due_date = datetime.strptime(todo['due_date'], '%Y-%m-%dT%H:%M')
@@ -154,7 +189,7 @@ def index():
                         except:
                             pass
             else:
-                filtered_todos = [todo for todo in user_state['todos'] if todo.get('priority') == filter_priority]
+                filtered_todos = [todo for todo in filtered_todos if todo.get('priority') == filter_priority]
 
         sorted_todos = sorted(
             filtered_todos,
@@ -162,7 +197,7 @@ def index():
         )
 
         # compute stats for this user
-        todos_ref = user_state['todos']
+        todos_ref = filtered_todos
         total = len(todos_ref)
         completed = len([t for t in todos_ref if t.get('completed')])
         pending = total - completed
@@ -213,18 +248,22 @@ def advanced_index():
     if gate:
         return gate
     username = get_current_username()
-    ensure_user(username)
-    user_state = USERS[username]
+    user_id = session.get('user_id')
+    if not supabase:
+        ensure_user(username)
+        user_state = USERS[username]
+    else:
+        user_state = None
     try:
         city = request.args.get('city', 'Istanbul')
         filter_priority = request.args.get('filter')
         weather_data = get_weather(city)
 
-        filtered_todos = user_state['todos']
+        filtered_todos = fetch_user_todos(user_id) if supabase else user_state['todos']
         if filter_priority:
             if filter_priority == 'overdue':
                 filtered_todos = []
-                for todo in user_state['todos']:
+                for todo in filtered_todos:
                     if todo.get('due_date'):
                         try:
                             due_date = datetime.strptime(todo['due_date'], '%Y-%m-%dT%H:%M')
@@ -233,7 +272,7 @@ def advanced_index():
                         except:
                             pass
             else:
-                filtered_todos = [todo for todo in user_state['todos'] if todo.get('priority') == filter_priority]
+                filtered_todos = [todo for todo in filtered_todos if todo.get('priority') == filter_priority]
 
         sorted_todos = sorted(
             filtered_todos,
@@ -241,7 +280,7 @@ def advanced_index():
         )
 
         # same stats as index for this user
-        todos_ref = user_state['todos']
+        todos_ref = filtered_todos
         total = len(todos_ref)
         completed = len([t for t in todos_ref if t.get('completed')])
         pending = total - completed
@@ -275,7 +314,7 @@ def advanced_index():
             current_city=city,
             current_filter=filter_priority,
             stats=stats,
-            categories=user_state['categories'],
+            categories=(fetch_user_categories(user_id) if supabase else user_state['categories']),
             user=username
         )
     except Exception as e:
@@ -294,22 +333,31 @@ def add_todo():
         return gate
     username = get_current_username()
     ensure_user(username)
-    user_state = USERS[username]
+    user_state = USERS[username] if not supabase else None
     todo_text = request.form.get('todo')
     priority = request.form.get('priority', 'orta')
     
     if not validate_todo_text(todo_text):
         return redirect(url_for('index'))
     
-    user_state['todo_counter'] += 1
+    if not supabase:
+        user_state['todo_counter'] += 1
     new_todo = {
-        'id': user_state['todo_counter'],
+        'id': (user_state['todo_counter'] if not supabase else None),
         'text': todo_text,
         'priority': priority,
         'completed': False,
         'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
     }
-    user_state['todos'].append(new_todo)
+    if supabase:
+        supabase.table('todos').insert({
+            'user_id': session.get('user_id'),
+            'text': todo_text,
+            'priority': priority,
+            'completed': False
+        }).execute()
+    else:
+        user_state['todos'].append(new_todo)
     return redirect(url_for('index'))
 
 @app.route('/add_advanced_todo', methods=['POST'])
@@ -319,7 +367,7 @@ def add_advanced_todo():
         return gate
     username = get_current_username()
     ensure_user(username)
-    user_state = USERS[username]
+    user_state = USERS[username] if not supabase else None
     todo_text = request.form.get('todo')
     priority = request.form.get('priority', 'orta')
     category_id = request.form.get('category_id')
@@ -330,9 +378,10 @@ def add_advanced_todo():
     if not validate_todo_text(todo_text):
         return redirect(url_for('advanced_index'))
     
-    user_state['todo_counter'] += 1
+    if not supabase:
+        user_state['todo_counter'] += 1
     new_todo = {
-        'id': user_state['todo_counter'],
+        'id': (user_state['todo_counter'] if not supabase else None),
         'text': todo_text,
         'priority': priority,
         'completed': False,
@@ -342,7 +391,19 @@ def add_advanced_todo():
         'tags': [tag.strip() for tag in tags.split(',') if tag.strip()],
         'category_id': int(category_id) if category_id else None
     }
-    user_state['todos'].append(new_todo)
+    if supabase:
+        supabase.table('todos').insert({
+            'user_id': session.get('user_id'),
+            'text': todo_text,
+            'priority': priority,
+            'completed': False,
+            'description': description or None,
+            'due_date': due_date or None,
+            'tags': [tag.strip() for tag in tags.split(',') if tag.strip()] if tags else None,
+            'category_id': category_id or None
+        }).execute()
+    else:
+        user_state['todos'].append(new_todo)
     return redirect(url_for('advanced_index'))
 
 @app.route('/add_category', methods=['POST'])
@@ -352,7 +413,7 @@ def add_category():
         return gate
     username = get_current_username()
     ensure_user(username)
-    user_state = USERS[username]
+    user_state = USERS[username] if not supabase else None
     name = request.form.get('name')
     color = request.form.get('color', '#007bff')
     
@@ -362,13 +423,21 @@ def add_category():
     if not color.startswith('#'):
         color = '#' + color
     
-    user_state['category_counter'] += 1
+    if not supabase:
+        user_state['category_counter'] += 1
     new_category = {
-        'id': user_state['category_counter'],
+        'id': (user_state['category_counter'] if not supabase else None),
         'name': name,
         'color': color
     }
-    user_state['categories'].append(new_category)
+    if supabase:
+        supabase.table('categories').insert({
+            'user_id': session.get('user_id'),
+            'name': name,
+            'color': color if color.startswith('#') else f'#{color}'
+        }).execute()
+    else:
+        user_state['categories'].append(new_category)
     return redirect(url_for('advanced_index'))
 
 @app.route('/complete/<int:todo_id>')
@@ -377,12 +446,18 @@ def complete_todo(todo_id):
     if gate:
         return gate
     username = get_current_username()
-    ensure_user(username)
-    user_state = USERS[username]
-    for todo in user_state['todos']:
-        if todo['id'] == todo_id:
-            todo['completed'] = not todo['completed']
-            break
+    if supabase:
+        user_id = session.get('user_id')
+        row = supabase.table('todos').select('completed').eq('id', todo_id).eq('user_id', user_id).single().execute().data
+        if row is not None:
+            supabase.table('todos').update({'completed': (not row.get('completed', False))}).eq('id', todo_id).eq('user_id', user_id).execute()
+    else:
+        ensure_user(username)
+        user_state = USERS[username]
+        for todo in user_state['todos']:
+            if todo['id'] == todo_id:
+                todo['completed'] = not todo['completed']
+                break
     referer = request.headers.get('Referer', '')
     if '/advanced' in referer:
         return redirect(url_for('advanced_index'))
@@ -394,9 +469,13 @@ def delete_todo(todo_id):
     if gate:
         return gate
     username = get_current_username()
-    ensure_user(username)
-    user_state = USERS[username]
-    user_state['todos'] = [todo for todo in user_state['todos'] if todo['id'] != todo_id]
+    if supabase:
+        user_id = session.get('user_id')
+        supabase.table('todos').delete().eq('id', todo_id).eq('user_id', user_id).execute()
+    else:
+        ensure_user(username)
+        user_state = USERS[username]
+        user_state['todos'] = [todo for todo in user_state['todos'] if todo['id'] != todo_id]
     referer = request.headers.get('Referer', '')
     if '/advanced' in referer:
         return redirect(url_for('advanced_index'))
@@ -415,43 +494,64 @@ def login():
         if not username:
             return render_template('login.html')
         session['username'] = username
-        ensure_user(username)
+        if supabase:
+            user_id = get_or_create_user(username)
+            session['user_id'] = user_id
+        else:
+            ensure_user(username)
         return redirect(url_for('index'))
     return render_template('login.html')
 
 @app.route('/logout')
 def logout():
     session.pop('username', None)
+    session.pop('user_id', None)
     return redirect(url_for('login'))
 
 @app.route('/api/todos', methods=['GET'])
 def api_get_todos():
     username = get_current_username()
-    if not username or username not in USERS:
+    user_id = session.get('user_id')
+    if not username:
         return jsonify({'success': False, 'error': 'auth required'}), 401
-    todos_ref = USERS[username]['todos']
+    if supabase:
+        todos_ref = fetch_user_todos(user_id)
+    else:
+        if username not in USERS:
+            return jsonify({'success': True, 'data': [], 'count': 0})
+        todos_ref = USERS[username]['todos']
     return jsonify({'success': True, 'data': todos_ref, 'count': len(todos_ref)})
 
 @app.route('/api/todos', methods=['POST'])
 def api_create_todo():
     username = get_current_username()
-    if not username or username not in USERS:
+    user_id = session.get('user_id')
+    if not username:
         return jsonify({'success': False, 'error': 'auth required'}), 401
-    user_state = USERS[username]
+    user_state = USERS[username] if not supabase else None
     data = request.get_json()
     if not data or 'text' not in data:
         return jsonify({'success': False, 'error': 'Text field required'}), 400
     
-    user_state['todo_counter'] += 1
+    if not supabase:
+        user_state['todo_counter'] += 1
     priority = data.get('priority', 'orta')
     new_todo = {
-        'id': user_state['todo_counter'],
+        'id': (user_state['todo_counter'] if not supabase else None),
         'text': data['text'],
         'priority': priority,
         'completed': False,
         'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
     }
-    user_state['todos'].append(new_todo)
+    if supabase:
+        supabase.table('todos').insert({
+            'user_id': user_id,
+            'text': data['text'],
+            'priority': priority,
+            'completed': False
+        }).execute()
+    else:
+        user_state['todos'].append(new_todo)
     return jsonify({
         'success': True,
         'data': new_todo
