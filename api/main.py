@@ -330,9 +330,5 @@ def not_found_error(error):
 def internal_error(error):
     return render_template('500.html'), 500
 
-# Vercel handler
-def handler(request):
-    return app(request.environ, request.start_response)
-
 if __name__ == '__main__':
     app.run(debug=True)
