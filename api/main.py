@@ -3,7 +3,13 @@ import os
 from datetime import datetime
 import requests
 
-app = Flask(__name__)
+# Point Flask to project-level templates and static directories
+app = Flask(
+    __name__,
+    template_folder='../templates',
+    static_folder='../static',
+    static_url_path='/static'
+)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-here')
 
 # In-memory storage
@@ -329,6 +335,16 @@ def not_found_error(error):
 @app.errorhandler(500)
 def internal_error(error):
     return render_template('500.html'), 500
+
+@app.route('/favicon.ico')
+def favicon_ico():
+    # Return 204 to avoid error spam when no favicon exists
+    return ('', 204)
+
+@app.route('/favicon.png')
+def favicon_png():
+    # Return 204 to avoid error spam when no favicon exists
+    return ('', 204)
 
 if __name__ == '__main__':
     app.run(debug=True)
