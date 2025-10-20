@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
 import os
 from datetime import datetime
 import requests
@@ -15,6 +15,32 @@ app = Flask(
     static_url_path='/static'
 )
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-here')
+
+# In-memory user store: username -> per-user state
+USERS = {}
+
+def get_current_username():
+    return session.get('username')
+
+def ensure_user(username):
+    if username not in USERS:
+        USERS[username] = {
+            'todos': [],
+            'todo_counter': 0,
+            'categories': [
+                {'id': 1, 'name': 'Genel', 'color': '#007bff'},
+                {'id': 2, 'name': 'İş', 'color': '#28a745'},
+                {'id': 3, 'name': 'Kişisel', 'color': '#ffc107'},
+                {'id': 4, 'name': 'Acil', 'color': '#dc3545'}
+            ],
+            'category_counter': 4,
+        }
+
+def require_login_redirect():
+    username = get_current_username()
+    if not username:
+        return redirect(url_for('login'))
+    return None
 
 # In-memory storage
 todos = []
@@ -103,16 +129,23 @@ def get_todo_statistics():
 
 @app.route('/')
 def index():
+    # auth gate
+    gate = require_login_redirect()
+    if gate:
+        return gate
+    username = get_current_username()
+    ensure_user(username)
+    user_state = USERS[username]
     try:
         city = request.args.get('city', 'Istanbul')
         filter_priority = request.args.get('filter')
         weather_data = get_weather(city)
 
-        filtered_todos = todos
+        filtered_todos = user_state['todos']
         if filter_priority:
             if filter_priority == 'overdue':
                 filtered_todos = []
-                for todo in todos:
+                for todo in user_state['todos']:
                     if todo.get('due_date'):
                         try:
                             due_date = datetime.strptime(todo['due_date'], '%Y-%m-%dT%H:%M')
@@ -121,14 +154,40 @@ def index():
                         except:
                             pass
             else:
-                filtered_todos = [todo for todo in todos if todo.get('priority') == filter_priority]
+                filtered_todos = [todo for todo in user_state['todos'] if todo.get('priority') == filter_priority]
 
         sorted_todos = sorted(
             filtered_todos,
             key=lambda x: (get_priority_order(x.get('priority', 'orta')), x.get('created_at', ''))
         )
 
-        stats = get_todo_statistics()
+        # compute stats for this user
+        todos_ref = user_state['todos']
+        total = len(todos_ref)
+        completed = len([t for t in todos_ref if t.get('completed')])
+        pending = total - completed
+        high_priority = len([t for t in todos_ref if t.get('priority') == 'yüksek'])
+        medium_priority = len([t for t in todos_ref if t.get('priority') == 'orta'])
+        low_priority = len([t for t in todos_ref if t.get('priority') == 'düşük'])
+        overdue = 0
+        for t in todos_ref:
+            if t.get('due_date'):
+                try:
+                    due_date = datetime.strptime(t['due_date'], '%Y-%m-%dT%H:%M')
+                    if due_date < datetime.now() and not t.get('completed', False):
+                        overdue += 1
+                except:
+                    pass
+        stats = {
+            'total': total,
+            'completed': completed,
+            'pending': pending,
+            'completion_rate': round((completed / total * 100), 1) if total > 0 else 0,
+            'high_priority': high_priority,
+            'medium_priority': medium_priority,
+            'low_priority': low_priority,
+            'overdue': overdue
+        }
 
         return render_template(
             'index.html',
@@ -137,7 +196,7 @@ def index():
             current_city=city,
             current_filter=filter_priority,
             stats=stats,
-            user=None
+            user=username
         )
     except Exception as e:
         app.logger.exception('Index route failed')
@@ -150,16 +209,22 @@ def index():
 
 @app.route('/advanced')
 def advanced_index():
+    gate = require_login_redirect()
+    if gate:
+        return gate
+    username = get_current_username()
+    ensure_user(username)
+    user_state = USERS[username]
     try:
         city = request.args.get('city', 'Istanbul')
         filter_priority = request.args.get('filter')
         weather_data = get_weather(city)
 
-        filtered_todos = todos
+        filtered_todos = user_state['todos']
         if filter_priority:
             if filter_priority == 'overdue':
                 filtered_todos = []
-                for todo in todos:
+                for todo in user_state['todos']:
                     if todo.get('due_date'):
                         try:
                             due_date = datetime.strptime(todo['due_date'], '%Y-%m-%dT%H:%M')
@@ -168,14 +233,40 @@ def advanced_index():
                         except:
                             pass
             else:
-                filtered_todos = [todo for todo in todos if todo.get('priority') == filter_priority]
+                filtered_todos = [todo for todo in user_state['todos'] if todo.get('priority') == filter_priority]
 
         sorted_todos = sorted(
             filtered_todos,
             key=lambda x: (get_priority_order(x.get('priority', 'orta')), x.get('created_at', ''))
         )
 
-        stats = get_todo_statistics()
+        # same stats as index for this user
+        todos_ref = user_state['todos']
+        total = len(todos_ref)
+        completed = len([t for t in todos_ref if t.get('completed')])
+        pending = total - completed
+        high_priority = len([t for t in todos_ref if t.get('priority') == 'yüksek'])
+        medium_priority = len([t for t in todos_ref if t.get('priority') == 'orta'])
+        low_priority = len([t for t in todos_ref if t.get('priority') == 'düşük'])
+        overdue = 0
+        for t in todos_ref:
+            if t.get('due_date'):
+                try:
+                    due_date = datetime.strptime(t['due_date'], '%Y-%m-%dT%H:%M')
+                    if due_date < datetime.now() and not t.get('completed', False):
+                        overdue += 1
+                except:
+                    pass
+        stats = {
+            'total': total,
+            'completed': completed,
+            'pending': pending,
+            'completion_rate': round((completed / total * 100), 1) if total > 0 else 0,
+            'high_priority': high_priority,
+            'medium_priority': medium_priority,
+            'low_priority': low_priority,
+            'overdue': overdue
+        }
 
         return render_template(
             'advanced_index.html',
@@ -184,8 +275,8 @@ def advanced_index():
             current_city=city,
             current_filter=filter_priority,
             stats=stats,
-            categories=categories,
-            user=None
+            categories=user_state['categories'],
+            user=username
         )
     except Exception as e:
         app.logger.exception('Advanced index route failed')
@@ -198,28 +289,37 @@ def advanced_index():
 
 @app.route('/add', methods=['POST'])
 def add_todo():
-    global todo_counter
+    gate = require_login_redirect()
+    if gate:
+        return gate
+    username = get_current_username()
+    ensure_user(username)
+    user_state = USERS[username]
     todo_text = request.form.get('todo')
     priority = request.form.get('priority', 'orta')
     
     if not validate_todo_text(todo_text):
         return redirect(url_for('index'))
     
-    todo_counter += 1
+    user_state['todo_counter'] += 1
     new_todo = {
-        'id': todo_counter,
+        'id': user_state['todo_counter'],
         'text': todo_text,
         'priority': priority,
         'completed': False,
         'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
     }
-    
-    todos.append(new_todo)
+    user_state['todos'].append(new_todo)
     return redirect(url_for('index'))
 
 @app.route('/add_advanced_todo', methods=['POST'])
 def add_advanced_todo():
-    global todo_counter
+    gate = require_login_redirect()
+    if gate:
+        return gate
+    username = get_current_username()
+    ensure_user(username)
+    user_state = USERS[username]
     todo_text = request.form.get('todo')
     priority = request.form.get('priority', 'orta')
     category_id = request.form.get('category_id')
@@ -230,9 +330,9 @@ def add_advanced_todo():
     if not validate_todo_text(todo_text):
         return redirect(url_for('advanced_index'))
     
-    todo_counter += 1
+    user_state['todo_counter'] += 1
     new_todo = {
-        'id': todo_counter,
+        'id': user_state['todo_counter'],
         'text': todo_text,
         'priority': priority,
         'completed': False,
@@ -242,13 +342,17 @@ def add_advanced_todo():
         'tags': [tag.strip() for tag in tags.split(',') if tag.strip()],
         'category_id': int(category_id) if category_id else None
     }
-    
-    todos.append(new_todo)
+    user_state['todos'].append(new_todo)
     return redirect(url_for('advanced_index'))
 
 @app.route('/add_category', methods=['POST'])
 def add_category():
-    global category_counter
+    gate = require_login_redirect()
+    if gate:
+        return gate
+    username = get_current_username()
+    ensure_user(username)
+    user_state = USERS[username]
     name = request.form.get('name')
     color = request.form.get('color', '#007bff')
     
@@ -258,19 +362,24 @@ def add_category():
     if not color.startswith('#'):
         color = '#' + color
     
-    category_counter += 1
+    user_state['category_counter'] += 1
     new_category = {
-        'id': category_counter,
+        'id': user_state['category_counter'],
         'name': name,
         'color': color
     }
-    
-    categories.append(new_category)
+    user_state['categories'].append(new_category)
     return redirect(url_for('advanced_index'))
 
 @app.route('/complete/<int:todo_id>')
 def complete_todo(todo_id):
-    for todo in todos:
+    gate = require_login_redirect()
+    if gate:
+        return gate
+    username = get_current_username()
+    ensure_user(username)
+    user_state = USERS[username]
+    for todo in user_state['todos']:
         if todo['id'] == todo_id:
             todo['completed'] = not todo['completed']
             break
@@ -281,8 +390,13 @@ def complete_todo(todo_id):
 
 @app.route('/delete/<int:todo_id>')
 def delete_todo(todo_id):
-    global todos
-    todos = [todo for todo in todos if todo['id'] != todo_id]
+    gate = require_login_redirect()
+    if gate:
+        return gate
+    username = get_current_username()
+    ensure_user(username)
+    user_state = USERS[username]
+    user_state['todos'] = [todo for todo in user_state['todos'] if todo['id'] != todo_id]
     referer = request.headers.get('Referer', '')
     if '/advanced' in referer:
         return redirect(url_for('advanced_index'))
@@ -294,45 +408,50 @@ def weather():
     weather_data = get_weather(city)
     return render_template('weather.html', weather=weather_data, current_city=city)
 
-# Minimal auth stubs to satisfy template links
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
+        username = (request.form.get('username') or '').strip()
+        if not username:
+            return render_template('login.html')
+        session['username'] = username
+        ensure_user(username)
         return redirect(url_for('index'))
     return render_template('login.html')
 
 @app.route('/logout')
 def logout():
-    return redirect(url_for('index'))
+    session.pop('username', None)
+    return redirect(url_for('login'))
 
 @app.route('/api/todos', methods=['GET'])
 def api_get_todos():
-    return jsonify({
-        'success': True,
-        'data': todos,
-        'count': len(todos)
-    })
+    username = get_current_username()
+    if not username or username not in USERS:
+        return jsonify({'success': False, 'error': 'auth required'}), 401
+    todos_ref = USERS[username]['todos']
+    return jsonify({'success': True, 'data': todos_ref, 'count': len(todos_ref)})
 
 @app.route('/api/todos', methods=['POST'])
 def api_create_todo():
-    global todo_counter
-    
+    username = get_current_username()
+    if not username or username not in USERS:
+        return jsonify({'success': False, 'error': 'auth required'}), 401
+    user_state = USERS[username]
     data = request.get_json()
     if not data or 'text' not in data:
         return jsonify({'success': False, 'error': 'Text field required'}), 400
     
-    todo_counter += 1
+    user_state['todo_counter'] += 1
     priority = data.get('priority', 'orta')
     new_todo = {
-        'id': todo_counter,
+        'id': user_state['todo_counter'],
         'text': data['text'],
         'priority': priority,
         'completed': False,
         'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
     }
-    
-    todos.append(new_todo)
-    
+    user_state['todos'].append(new_todo)
     return jsonify({
         'success': True,
         'data': new_todo
