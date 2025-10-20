@@ -28,26 +28,38 @@ def _normalize_url(url: str) -> str:
 
 SUPABASE_URL = _normalize_url(RAW_SUPABASE_URL)
 SUPABASE_ANON_KEY = RAW_SUPABASE_ANON_KEY
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY) if SUPABASE_URL and SUPABASE_ANON_KEY else None
+supabase: Client = None
+try:
+    if SUPABASE_URL and SUPABASE_ANON_KEY:
+        supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+except Exception as _e:
+    supabase = None
 
 # Helpers for Supabase
-def get_or_create_user(username: str) -> str:
-    # Try find
-    res = supabase.table('users').select('id').eq('username', username).limit(1).execute()
-    rows = res.data or []
-    if rows:
-        return rows[0]['id']
-    # Insert
-    res = supabase.table('users').insert({'username': username}).execute()
-    return (res.data or [{}])[0].get('id')
+def get_or_create_user(username: str) -> str | None:
+    try:
+        res = supabase.table('users').select('id').eq('username', username).limit(1).execute()
+        rows = res.data or []
+        if rows:
+            return rows[0]['id']
+        res = supabase.table('users').insert({'username': username}).execute()
+        return (res.data or [{}])[0].get('id')
+    except Exception:
+        return None
 
 def fetch_user_todos(user_id: str):
-    res = supabase.table('todos').select('*').eq('user_id', user_id).order('created_at').execute()
-    return res.data or []
+    try:
+        res = supabase.table('todos').select('*').eq('user_id', user_id).order('created_at').execute()
+        return res.data or []
+    except Exception:
+        return []
 
 def fetch_user_categories(user_id: str):
-    res = supabase.table('categories').select('*').eq('user_id', user_id).order('created_at').execute()
-    return res.data or []
+    try:
+        res = supabase.table('categories').select('*').eq('user_id', user_id).order('created_at').execute()
+        return res.data or []
+    except Exception:
+        return []
 
 # In-memory user store: username -> per-user state
 USERS = {}
@@ -352,12 +364,20 @@ def add_todo():
         'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
     }
     if supabase:
-        supabase.table('todos').insert({
-            'user_id': session.get('user_id'),
-            'text': todo_text,
-            'priority': priority,
-            'completed': False
-        }).execute()
+        try:
+            supabase.table('todos').insert({
+                'user_id': session.get('user_id'),
+                'text': todo_text,
+                'priority': priority,
+                'completed': False
+            }).execute()
+        except Exception:
+            # fallback to memory if insert fails
+            ensure_user(username)
+            user_state = USERS[username]
+            user_state['todo_counter'] += 1
+            new_todo['id'] = user_state['todo_counter']
+            user_state['todos'].append(new_todo)
     else:
         user_state['todos'].append(new_todo)
     return redirect(url_for('index'))
@@ -394,16 +414,23 @@ def add_advanced_todo():
         'category_id': int(category_id) if category_id else None
     }
     if supabase:
-        supabase.table('todos').insert({
-            'user_id': session.get('user_id'),
-            'text': todo_text,
-            'priority': priority,
-            'completed': False,
-            'description': description or None,
-            'due_date': due_date or None,
-            'tags': [tag.strip() for tag in tags.split(',') if tag.strip()] if tags else None,
-            'category_id': category_id or None
-        }).execute()
+        try:
+            supabase.table('todos').insert({
+                'user_id': session.get('user_id'),
+                'text': todo_text,
+                'priority': priority,
+                'completed': False,
+                'description': description or None,
+                'due_date': due_date or None,
+                'tags': [tag.strip() for tag in tags.split(',') if tag.strip()] if tags else None,
+                'category_id': category_id or None
+            }).execute()
+        except Exception:
+            ensure_user(username)
+            user_state = USERS[username]
+            user_state['todo_counter'] += 1
+            new_todo['id'] = user_state['todo_counter']
+            user_state['todos'].append(new_todo)
     else:
         user_state['todos'].append(new_todo)
     return redirect(url_for('advanced_index'))
@@ -433,11 +460,18 @@ def add_category():
         'color': color
     }
     if supabase:
-        supabase.table('categories').insert({
-            'user_id': session.get('user_id'),
-            'name': name,
-            'color': color if color.startswith('#') else f'#{color}'
-        }).execute()
+        try:
+            supabase.table('categories').insert({
+                'user_id': session.get('user_id'),
+                'name': name,
+                'color': color if color.startswith('#') else f'#{color}'
+            }).execute()
+        except Exception:
+            ensure_user(username)
+            user_state = USERS[username]
+            user_state['category_counter'] += 1
+            new_category['id'] = user_state['category_counter']
+            user_state['categories'].append(new_category)
     else:
         user_state['categories'].append(new_category)
     return redirect(url_for('advanced_index'))
@@ -449,10 +483,13 @@ def complete_todo(todo_id):
         return gate
     username = get_current_username()
     if supabase:
-        user_id = session.get('user_id')
-        row = supabase.table('todos').select('completed').eq('id', todo_id).eq('user_id', user_id).single().execute().data
-        if row is not None:
-            supabase.table('todos').update({'completed': (not row.get('completed', False))}).eq('id', todo_id).eq('user_id', user_id).execute()
+        try:
+            user_id = session.get('user_id')
+            row = supabase.table('todos').select('completed').eq('id', todo_id).eq('user_id', user_id).single().execute().data
+            if row is not None:
+                supabase.table('todos').update({'completed': (not row.get('completed', False))}).eq('id', todo_id).eq('user_id', user_id).execute()
+        except Exception:
+            pass
     else:
         ensure_user(username)
         user_state = USERS[username]
@@ -472,8 +509,11 @@ def delete_todo(todo_id):
         return gate
     username = get_current_username()
     if supabase:
-        user_id = session.get('user_id')
-        supabase.table('todos').delete().eq('id', todo_id).eq('user_id', user_id).execute()
+        try:
+            user_id = session.get('user_id')
+            supabase.table('todos').delete().eq('id', todo_id).eq('user_id', user_id).execute()
+        except Exception:
+            pass
     else:
         ensure_user(username)
         user_state = USERS[username]
@@ -496,10 +536,10 @@ def login():
         if not username:
             return render_template('login.html')
         session['username'] = username
-        if supabase:
-            user_id = get_or_create_user(username)
+        user_id = get_or_create_user(username) if supabase else None
+        if user_id:
             session['user_id'] = user_id
-        else:
+        if not supabase or not user_id:
             ensure_user(username)
         return redirect(url_for('index'))
     return render_template('login.html')
