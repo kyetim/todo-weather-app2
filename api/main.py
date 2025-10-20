@@ -1,10 +1,12 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
+from dotenv import load_dotenv
 import os
 from datetime import datetime
 from supabase import create_client, Client
 import requests
 
 # Point Flask to project-level templates and static directories using absolute paths
+load_dotenv()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_DIR = os.path.normpath(os.path.join(BASE_DIR, '..', 'templates'))
 STATIC_DIR = os.path.normpath(os.path.join(BASE_DIR, '..', 'static'))
@@ -17,9 +19,9 @@ app = Flask(
 )
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-here')
 
-# Supabase client (env-only; no fallbacks)
-RAW_SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
-RAW_SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
+# Supabase client (with safe fallbacks to keep app running)
+RAW_SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://rzoibutxxeljddjduodg.supabase.co")
+RAW_SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ6b2lidXR4eGVsamRkamR1b2RnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2NDIzODIsImV4cCI6MjA3NjIxODM4Mn0.GKSOadm-VRmwUr83OLIwf1SZjvABmkoQJHCYhP7RQcg")
 
 def _normalize_url(url: str) -> str:
     return url[1:] if url.startswith('@') else url
