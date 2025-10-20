@@ -294,6 +294,17 @@ def weather():
     weather_data = get_weather(city)
     return render_template('weather.html', weather=weather_data, current_city=city)
 
+# Minimal auth stubs to satisfy template links
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        return redirect(url_for('index'))
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    return redirect(url_for('index'))
+
 @app.route('/api/todos', methods=['GET'])
 def api_get_todos():
     return jsonify({
