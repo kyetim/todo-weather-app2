@@ -3,11 +3,15 @@ import os
 from datetime import datetime
 import requests
 
-# Point Flask to project-level templates and static directories
+# Point Flask to project-level templates and static directories using absolute paths
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+TEMPLATE_DIR = os.path.normpath(os.path.join(BASE_DIR, '..', 'templates'))
+STATIC_DIR = os.path.normpath(os.path.join(BASE_DIR, '..', 'static'))
+
 app = Flask(
     __name__,
-    template_folder='../templates',
-    static_folder='../static',
+    template_folder=TEMPLATE_DIR,
+    static_folder=STATIC_DIR,
     static_url_path='/static'
 )
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-here')
@@ -335,6 +339,10 @@ def not_found_error(error):
 @app.errorhandler(500)
 def internal_error(error):
     return render_template('500.html'), 500
+
+@app.route('/health')
+def health():
+    return jsonify({"ok": True}), 200
 
 @app.route('/favicon.ico')
 def favicon_ico():
